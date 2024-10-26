@@ -29,7 +29,7 @@ A fun and interactive memory matching game built with Vite, React, TypeScript, a
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/memory-matching-game.git
+   git clone https://github.com/Kaempy/memory-matching-game.git
    cd memory-matching-game
    ```
 
