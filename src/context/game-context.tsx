@@ -1,126 +1,127 @@
-// src/context/GameContext.tsx
-import {
+import React, {
   createContext,
   ReactNode,
   useContext,
   useEffect,
   useState,
 } from 'react';
-import { Card } from '../types';
+import { CardType } from '../types';
 
 type GameContextType = {
-  turns: number;
+  click: number;
   bestScore: number;
+  isBestScore: boolean;
   loading: boolean;
   showResults: boolean;
-  cards: Card[];
-  selectedCard1: Card | null;
-  selectedCard2: Card | null;
-  disable: boolean;
-  isBestScore: boolean;
-  handleSelectedCard: (card: Card) => void;
-  // restartGame: () => void;
+  cards: CardType[];
+  handleCardClick: (index: number) => void;
   shuffleCards: () => void;
 };
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
-export const GameProvider = ({ children }: { children: ReactNode }) => {
-  const [turns, setTurns] = useState<number>(0);
+export const GameProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
+  const [cards, setCards] = useState<CardType[]>([]);
+  const [click, setClick] = useState<number>(0);
+  const [showResults, setShowResults] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [isBestScore, setIsBestScore] = useState<boolean>(false);
   const [bestScore, setBestScore] = useState<number>(() => {
-    // TODO: Get bestScore from localStorage
     const storedBestScore = localStorage.getItem('bestScore');
     return storedBestScore ? JSON.parse(storedBestScore) : 0;
   });
+  const [flippedCards, setFlippedCards] = useState<number[]>([]);
 
-  const [loading, setLoading] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [cards, setCards] = useState<Card[]>([]);
-  const [cardUrl, setCardUrl] = useState<{ src: Card['src'] }[]>([]);
-  const [selectedCard1, setSelectedCard1] = useState<Card | null>(null);
-  const [selectedCard2, setSelectedCard2] = useState<Card | null>(null);
-  const [disable, setDisable] = useState(false);
-  const [isBestScore, setIsBestScore] = useState(false);
+  // Function to generate card pairs with images
+  const fetchImageUrls = async (count: number): Promise<string[]> => {
+    const fetchPromises = Array.from({ length: count }, (_, i) =>
+      fetch(`https://picsum.photos/200?random=${i}`).then(
+        (response) => response.url
+      )
+    );
+    return Promise.all(fetchPromises);
+  };
 
-  // TODO: Fetch images for the game board.
+  const generateCards = async (): Promise<CardType[]> => {
+    const imageUrls = await fetchImageUrls(8);
+    const cards: CardType[] = [];
+
+    imageUrls.forEach((url, i) => {
+      const card1: CardType = {
+        id: i * 2,
+        src: url,
+        isFlipped: false,
+        isMatched: false,
+      };
+      const card2: CardType = {
+        id: i * 2 + 1,
+        src: url,
+        isFlipped: false,
+        isMatched: false,
+      };
+      cards.push(card1, card2);
+    });
+
+    return cards.sort(() => Math.random() - 0.5);
+  };
+
+  const shuffleCards = async () => {
+    setLoading(true);
+    const generatedCards = await generateCards();
+    setCards(generatedCards);
+    setClick(0);
+    setShowResults(false);
+    setIsBestScore(false);
+    setFlippedCards([]);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchImages = async () => {
-      setLoading(true);
-      try {
-        const images = [];
-        for (let i = 0; i < 8; i++) {
-          const response = await fetch(`https://picsum.photos/200?random=${i}`);
-          images.push({ src: response.url });
-        }
-        setCardUrl(images);
-      } catch (error: any) {
-        console.error(error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchImages();
+    shuffleCards();
   }, []);
 
-  const shuffleCards = () => {
-    const shuffledCards = [...cardUrl, ...cardUrl]
-      .sort(() => Math.random() - 0.5)
-      .map((card) => ({ ...card, id: Math.random(), matched: false }));
-    setCards(shuffledCards);
-    setTurns(0);
-    setSelectedCard1(null);
-    setSelectedCard2(null);
-    setShowResults(false);
-  };
+  const handleCardClick = (index: number) => {
+    if (
+      flippedCards.length === 2 ||
+      cards[index].isFlipped ||
+      cards[index].isMatched
+    )
+      return;
 
-  useEffect(() => {
-    if (cardUrl.length > 0) {
-      shuffleCards();
-    }
-  }, [cardUrl]);
+    const newCards = [...cards];
+    newCards[index].isFlipped = true;
+    setCards(newCards);
+    setFlippedCards((prev) => [...prev, index]);
+    setClick((prev) => prev + 1);
 
-  const handleSelectedCard = (card: Card) => {
-    if (!disable) {
-      selectedCard1 ? setSelectedCard2(card) : setSelectedCard1(card);
-    }
-  };
+    if (flippedCards.length === 1) {
+      const firstCard = cards[flippedCards[0]];
+      const secondCard = newCards[index];
 
-  // TODO: Logic to handle resetting selected card.
-  const resetSelectedCards = () => {
-    setSelectedCard1(null);
-    setSelectedCard2(null);
-    setDisable(false);
-  };
-
-  const resetTurn = () => {
-    setTurns((prev) => prev + 1);
-    resetSelectedCards();
-  };
-  // TODO: Comparing selectedCard card one with selectedCard card two.
-  useEffect(() => {
-    if (selectedCard1 && selectedCard2) {
-      setDisable(true);
-      if (selectedCard1.src === selectedCard2.src) {
-        setCards((prev) =>
-          prev.map((card) =>
-            card.src === selectedCard1.src ? { ...card, matched: true } : card
-          )
-        );
-        resetTurn();
+      if (firstCard.src === secondCard.src) {
+        newCards[flippedCards[0]].isMatched = true;
+        newCards[index].isMatched = true;
+        setCards(newCards);
+        setFlippedCards([]);
       } else {
         setTimeout(() => {
-          resetTurn();
-        }, 1000);
+          newCards[flippedCards[0]].isFlipped = false;
+          newCards[index].isFlipped = false;
+          setCards(newCards);
+          setFlippedCards([]);
+        }, 800);
       }
     }
-  }, [selectedCard1, selectedCard2]);
+  };
 
   // TODO: Function to compare counts with best score
   const updateBestScore = () => {
-    if (turns > 0 && turns < bestScore) {
+    if (click > 0 && click < bestScore) {
       setIsBestScore(true);
-      setBestScore(turns);
-    } else if (turns >= bestScore) {
+      setBestScore(click);
+    } else if (click >= bestScore) {
       setIsBestScore(false);
     }
   };
@@ -130,13 +131,9 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('bestScore', JSON.stringify(bestScore));
   }, [isBestScore]);
 
-  // useEffect(() => {
-  //   localStorage.setItem('bestScore', JSON.stringify(bestScore));
-  // }, [bestScore]);
-
   // TODO: Update bestScore if the current turns are a valid score and lower than the existing bestScore
   useEffect(() => {
-    const allCardsMatched = cards.every((card) => card.matched);
+    const allCardsMatched = cards.every((card) => card.isMatched);
     if (allCardsMatched) {
       updateBestScore();
       setShowResults(true);
@@ -146,17 +143,14 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
   return (
     <GameContext.Provider
       value={{
-        turns,
+        cards,
+        click,
         bestScore,
+        showResults,
         isBestScore,
         loading,
-        showResults,
-        cards,
-        selectedCard1,
-        selectedCard2,
-        disable,
-        handleSelectedCard,
         shuffleCards,
+        handleCardClick,
       }}
     >
       {children}
@@ -166,8 +160,7 @@ export const GameProvider = ({ children }: { children: ReactNode }) => {
 
 export const useGameContext = () => {
   const context = useContext(GameContext);
-  if (!context) {
+  if (!context)
     throw new Error('useGameContext must be used within a GameProvider');
-  }
   return context;
 };

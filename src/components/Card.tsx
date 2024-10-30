@@ -1,45 +1,22 @@
-// Card.tsx
-import { memo } from 'react';
-import cardBack from '../assets/card-back.png';
+// src/components/Card.tsx
+import React, { memo } from 'react';
+import cardfront from '../assets/card-back.png';
 import '../styles/Card.css';
-import { Card as CardType } from '../types';
+import { CardType } from '../types';
+interface CardProps {
+  card: CardType;
+  onClick: () => void;
+}
 
-type Props = {
-  data: CardType;
-  handleSelectedCard: (card: CardType) => void;
-  flipped: boolean;
-  disable: boolean;
-};
-
-const Card = ({
-  data: { id, src, matched },
-  handleSelectedCard,
-  flipped,
-  disable,
-}: Props) => {
-  const handleClick = () => {
-    if (!disable && !flipped) {
-      handleSelectedCard({ id, src, matched });
-    }
-  };
-
+const Card: React.FC<CardProps> = ({ card, onClick }) => {
   return (
-    <div className="card-container" onClick={handleClick}>
-      <div className={`card ${flipped ? 'flipped' : ''}`}>
-        <div className="front">
-          <img
-            src={src}
-            alt={`card front ${id}`}
-            className="rounded-md w-full object-contain"
-          />
-        </div>
-        <div className="back">
-          <img
-            src={cardBack}
-            alt="card back"
-            className="rounded-md w-full object-contain"
-          />
-        </div>
+    <div
+      className={`card ${card.isFlipped || card.isMatched ? 'flipped' : ''}`}
+      onClick={onClick}
+    >
+      <div className="card-inner">
+        <img className="card-front" alt="card back" src={cardfront} />
+        <img className="card-back" alt={`${card.id}`} src={card.src} />
       </div>
     </div>
   );
